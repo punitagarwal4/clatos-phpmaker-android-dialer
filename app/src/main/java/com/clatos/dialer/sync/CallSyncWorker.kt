@@ -9,6 +9,7 @@ import androidx.work.WorkerParameters
 import com.clatos.dialer.core.database.dao.CallLogDao
 import com.clatos.dialer.core.database.entity.CallLogEntity
 import com.clatos.dialer.core.database.entity.RecordingState
+import com.clatos.dialer.core.database.entity.SyncStatus
 import com.clatos.dialer.core.datastore.SessionStore
 import com.clatos.dialer.core.network.CrmApi
 import com.clatos.dialer.core.network.dto.CallLogMetadata
@@ -51,7 +52,13 @@ class CallSyncWorker @AssistedInject constructor(
                 pruneRecording(log)
             } else {
                 hadFailure = true
-                callLogDao.markAttempt(log.id)
+                callLogDao.incrementAttempt(log.id)
+                // Give up after repeated failures so a permanently-bad row
+                // (e.g. 413 too large) doesn't retry forever; it stays visible
+                // as FAILED rather than blocking the queue.
+                if (log.attempts + 1 >= MAX_ATTEMPTS) {
+                    callLogDao.setStatus(log.id, SyncStatus.FAILED)
+                }
             }
         }
 
@@ -100,6 +107,7 @@ class CallSyncWorker @AssistedInject constructor(
     companion object {
         const val NAME = "call_sync"
         const val PERIODIC_NAME = "call_sync_periodic"
+        const val MAX_ATTEMPTS = 8
 
         fun constraints(): Constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)

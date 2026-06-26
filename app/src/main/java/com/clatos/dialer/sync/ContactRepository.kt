@@ -50,11 +50,22 @@ class ContactRepository @Inject constructor(
             else -> since
         }
         val startedAt = Instant.now().toString()
-        val response = crmApi.contacts(since = effectiveSince)
-        val entities = response.data.map { it.toEntity() }
-        contactDao.upsertAll(entities)
+        var page = 1
+        var total = 0
+        // Page through all results — a single page (per_page=100) would silently
+        // drop contacts beyond the first page.
+        while (true) {
+            val response = crmApi.contacts(since = effectiveSince, page = page, perPage = PAGE_SIZE)
+            val entities = response.data.map { it.toEntity() }
+            if (entities.isNotEmpty()) {
+                contactDao.upsertAll(entities)
+                total += entities.size
+            }
+            if (response.data.size < PAGE_SIZE || page >= MAX_PAGES) break
+            page++
+        }
         sessionStore.setLastContactSync(startedAt)
-        entities.size
+        total
     }
 
     /** Merged device + CRM contacts, deduped by number, filtered by [query]. */
@@ -116,6 +127,11 @@ class ContactRepository @Inject constructor(
             contactDao.upsertAll(listOf(created.toEntity()))
             created
         }
+
+    private companion object {
+        const val PAGE_SIZE = 100
+        const val MAX_PAGES = 500
+    }
 
     private fun ContactDto.toEntity() = ContactEntity(
         id = "crm:$id",

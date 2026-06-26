@@ -25,8 +25,12 @@ interface CallLogDao {
     @Query("UPDATE call_logs SET syncStatus = :status, remoteId = :remoteId WHERE id = :id")
     suspend fun markSynced(id: Long, remoteId: Long?, status: SyncStatus = SyncStatus.SYNCED)
 
-    @Query("UPDATE call_logs SET syncStatus = :status, attempts = attempts + 1 WHERE id = :id")
-    suspend fun markAttempt(id: Long, status: SyncStatus = SyncStatus.FAILED)
+    /** Records a failed upload attempt but keeps the row PENDING so it retries. */
+    @Query("UPDATE call_logs SET attempts = attempts + 1 WHERE id = :id")
+    suspend fun incrementAttempt(id: Long)
+
+    @Query("UPDATE call_logs SET syncStatus = :status WHERE id = :id")
+    suspend fun setStatus(id: Long, status: SyncStatus)
 
     @Query("SELECT * FROM call_logs WHERE normalizedNumber = :normalized ORDER BY startedAt DESC LIMIT 20")
     suspend fun recentForNumber(normalized: String): List<CallLogEntity>

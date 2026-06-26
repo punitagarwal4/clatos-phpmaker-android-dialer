@@ -12,6 +12,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -63,9 +64,18 @@ class ClatosInCallService : InCallService() {
 
         // Surface the UI: full-screen notification for incoming, direct launch otherwise.
         if (isIncoming) {
-            CallNotifications.showIncoming(this, callManager.state.value?.let {
-                it.displayName ?: it.number
-            }.orEmpty())
+            val initial = callManager.state.value
+            CallNotifications.showIncoming(this, initial?.let { it.displayName ?: it.number }.orEmpty())
+            // Caller ID resolves asynchronously; re-post the notification with the
+            // name once it's known, as long as the call is still ringing.
+            scope.launch {
+                val resolved = callManager.state.first {
+                    it == null || it.displayName != null || it.phase != CallPhase.RINGING
+                }
+                if (resolved?.phase == CallPhase.RINGING && resolved.displayName != null) {
+                    CallNotifications.showIncoming(this@ClatosInCallService, resolved.displayName)
+                }
+            }
         } else {
             CallNotifications.launchInCall(this)
         }
@@ -79,10 +89,12 @@ class ClatosInCallService : InCallService() {
         call.unregisterCallback(callback)
         CallNotifications.cancel(this)
         val active = activeCalls.remove(call) ?: return
-        RecordingService.stop(this)
         callManager.onCallRemoved()
         scope.launch {
+            // Finalize the recording BEFORE tearing down the mic foreground
+            // service, otherwise the file can be truncated/corrupted.
             val recording = callRecorder.onCallEnded()
+            RecordingService.stop(this@ClatosInCallService)
             callLogRepository.persistEndedCall(call, active, recording)
         }
     }
@@ -103,10 +115,12 @@ class ClatosInCallService : InCallService() {
                 // granted — on Android 14+ starting a microphone FGS without
                 // RECORD_AUDIO throws and would crash the call.
                 if (PermissionUtils.isGranted(this, Manifest.permission.RECORD_AUDIO)) {
-                    RecordingService.start(this)
                     scope.launch {
+                        RecordingService.start(this@ClatosInCallService)
                         val ok = callRecorder.onCallConnected(active.clientCallId)
                         callManager.setRecording(ok)
+                        // No working strategy → don't keep the mic FGS running.
+                        if (!ok) RecordingService.stop(this@ClatosInCallService)
                     }
                 } else {
                     callManager.setRecording(false)

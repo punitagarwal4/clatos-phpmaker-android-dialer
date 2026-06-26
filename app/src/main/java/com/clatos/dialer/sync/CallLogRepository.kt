@@ -71,8 +71,10 @@ class CallLogRepository @Inject constructor(
             .setConstraints(CallSyncWorker.constraints())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
+        // KEEP: a single in-flight worker already drains all PENDING rows, so we
+        // don't stack redundant uploads behind a backed-off retry.
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(CallSyncWorker.NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+            .enqueueUniqueWork(CallSyncWorker.NAME, ExistingWorkPolicy.KEEP, request)
     }
 
     /** Periodic safety-net sync so queued logs drain even with no new calls. */
