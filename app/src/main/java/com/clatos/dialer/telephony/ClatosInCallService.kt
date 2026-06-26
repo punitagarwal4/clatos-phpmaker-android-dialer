@@ -1,8 +1,10 @@
 package com.clatos.dialer.telephony
 
+import android.Manifest
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.InCallService
+import com.clatos.dialer.core.common.PermissionUtils
 import com.clatos.dialer.recording.CallRecorder
 import com.clatos.dialer.recording.RecordingService
 import com.clatos.dialer.sync.CallLogRepository
@@ -97,10 +99,17 @@ class ClatosInCallService : InCallService() {
             val active = activeCalls[call] ?: return
             if (!active.recordingStarted) {
                 active.recordingStarted = true
-                RecordingService.start(this)
-                scope.launch {
-                    val ok = callRecorder.onCallConnected(active.clientCallId)
-                    callManager.setRecording(ok)
+                // Only start the microphone foreground service when the mic is
+                // granted — on Android 14+ starting a microphone FGS without
+                // RECORD_AUDIO throws and would crash the call.
+                if (PermissionUtils.isGranted(this, Manifest.permission.RECORD_AUDIO)) {
+                    RecordingService.start(this)
+                    scope.launch {
+                        val ok = callRecorder.onCallConnected(active.clientCallId)
+                        callManager.setRecording(ok)
+                    }
+                } else {
+                    callManager.setRecording(false)
                 }
             }
         }
