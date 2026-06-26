@@ -58,6 +58,12 @@ class SessionStore @Inject constructor(
         _onboardingComplete.value = complete
     }
 
+    fun lastContactSync(): String? = prefs.getString(KEY_LAST_CONTACT_SYNC, null)
+
+    fun setLastContactSync(iso: String) {
+        prefs.edit().putString(KEY_LAST_CONTACT_SYNC, iso).apply()
+    }
+
     /** Clears the token/session but preserves the onboarding flag so a re-login
      *  on the same device skips first-run setup. */
     fun clearSession() {
@@ -81,5 +87,6 @@ class SessionStore @Inject constructor(
         const val KEY_AGENT_ID = "agent_id"
         const val KEY_AGENT_NAME = "agent_name"
         const val KEY_ONBOARDED = "onboarding_complete"
+        const val KEY_LAST_CONTACT_SYNC = "last_contact_sync"
     }
 }

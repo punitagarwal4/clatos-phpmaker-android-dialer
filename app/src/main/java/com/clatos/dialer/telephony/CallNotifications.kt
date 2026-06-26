@@ -44,9 +44,27 @@ object CallNotifications {
             .setOngoing(true)
             .setFullScreenIntent(fullScreen, true)
             .setContentIntent(fullScreen)
+            .addAction(
+                android.R.drawable.sym_action_call,
+                context.getString(R.string.call_answer),
+                actionIntent(context, CallActionReceiver.ACTION_ANSWER, requestCode = 1),
+            )
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                context.getString(R.string.call_decline),
+                actionIntent(context, CallActionReceiver.ACTION_DECLINE, requestCode = 2),
+            )
             .build()
         context.getSystemService(NotificationManager::class.java)
             .notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun actionIntent(context: Context, action: String, requestCode: Int): PendingIntent {
+        val intent = Intent(context, CallActionReceiver::class.java).setAction(action)
+        return PendingIntent.getBroadcast(
+            context, requestCode, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     fun launchInCall(context: Context) {

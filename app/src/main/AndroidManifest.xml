@@ -103,6 +103,11 @@
             android:exported="false"
             android:foregroundServiceType="microphone|phoneCall" />
 
+        <!-- Answer/Decline actions from the incoming-call notification -->
+        <receiver
+            android:name=".telephony.CallActionReceiver"
+            android:exported="false" />
+
         <!-- WorkManager is initialized via Hilt (custom WorkerFactory) -->
         <provider
             android:name="androidx.startup.InitializationProvider"

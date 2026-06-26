@@ -7,9 +7,11 @@ import com.clatos.dialer.core.database.dao.ContactDao
 import com.clatos.dialer.core.database.entity.CallLogEntity
 import com.clatos.dialer.core.database.entity.ContactEntity
 import com.clatos.dialer.core.database.entity.ContactSource
+import com.clatos.dialer.core.datastore.SessionStore
 import com.clatos.dialer.core.network.CrmApi
 import com.clatos.dialer.core.network.dto.ContactDto
 import com.clatos.dialer.core.network.dto.CreateContactRequest
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,12 +36,24 @@ class ContactRepository @Inject constructor(
     private val contactDao: ContactDao,
     private val callLogDao: CallLogDao,
     private val deviceContacts: DeviceContactsDataSource,
+    private val sessionStore: SessionStore,
 ) {
-    /** Pull CRM contacts (optionally incremental) into the local cache. */
+    /**
+     * Pull CRM contacts into the local cache. Incremental by default: sends the
+     * stored last-sync timestamp as `since` and records a new one on success.
+     * Pass [since] = "" to force a full refresh.
+     */
     suspend fun syncCrmContacts(since: String? = null): Result<Int> = runCatching {
-        val response = crmApi.contacts(since = since)
+        val effectiveSince = when (since) {
+            null -> sessionStore.lastContactSync()  // incremental
+            "" -> null                               // forced full refresh
+            else -> since
+        }
+        val startedAt = Instant.now().toString()
+        val response = crmApi.contacts(since = effectiveSince)
         val entities = response.data.map { it.toEntity() }
         contactDao.upsertAll(entities)
+        sessionStore.setLastContactSync(startedAt)
         entities.size
     }
 
