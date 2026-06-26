@@ -23,13 +23,15 @@ object DialerRole {
     }
 
     /** Intent that asks the user to make this app the default dialer, or null if unavailable. */
-    fun requestIntent(context: Context): Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        val roleManager = context.getSystemService(RoleManager::class.java) ?: return null
-        if (!roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) return null
-        roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
-    } else {
-        @Suppress("DEPRECATION")
-        Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
-            .putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, context.packageName)
+    fun requestIntent(context: Context): Intent? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = context.getSystemService(RoleManager::class.java) ?: return null
+            if (!roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) return null
+            roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
+        } else {
+            @Suppress("DEPRECATION")
+            Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+                .putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, context.packageName)
+        }
     }
 }
