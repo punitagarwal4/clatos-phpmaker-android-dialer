@@ -10,5 +10,6 @@
 local.properties
 *.keystore
 !debug.keystore
+keystore.properties
 /app/build/
 /app/release/

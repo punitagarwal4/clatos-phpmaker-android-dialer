@@ -23,8 +23,14 @@ This tracks the gap between the implemented app and a production-ready release, 
 
 - Incoming-call notification **Answer/Decline action buttons** (via `CallActionReceiver`).
 - **Contact create** now surfaces saving/error state instead of failing silently.
-- **Incremental contact sync** persists and sends a `since` timestamp.
+- **Incremental contact sync** persists and sends a `since` timestamp, paging through all results.
 - **Unit tests** for phone-number normalization + CI now runs `testDebugUnitTest`.
+- **Runtime-correctness fixes** from an audit: recording finalized before the mic FGS is torn
+  down; failed uploads retry (instead of being stuck `FAILED`); sync uses `KEEP` (no stacking);
+  mic FGS not held when nothing records; mic-permission crash guard; caller-ID in notification.
+- **Self-contained build**: committed the Gradle wrapper (`gradlew` + `gradle-wrapper.jar`).
+- **Release signing wired**: optional `keystore.properties` at the repo root enables a signed
+  release build (nothing secret committed; debug builds unaffected).
 
 ## ⛔ Requires external input / hardware — cannot be finished in-repo
 
@@ -37,12 +43,12 @@ These are genuinely blocked on decisions or resources only the project owner can
    Play Store; left as a documented enhancement rather than dead code. → Decide per target devices.
 3. **Real PHPMaker API mapping.** `core/network` codes against `docs/API_CONTRACT.md` (assumed paths/
    fields/auth). → Provide real endpoints / Swagger / Postman to finalize DTOs + paths.
-4. **Release signing & distribution.** CI builds a debug APK; release signing needs a keystore +
-   CI secrets. → Provide/sanction a signing keystore.
-5. **Gradle wrapper jar.** Not committed (binary); CI generates it via `gradle wrapper`. → Optionally
-   commit the wrapper for local `./gradlew`.
-6. **Real-device QA.** Acceptance criteria in `USER_STORIES.md` need on-device validation across the
+4. **Release keystore.** The signing config is wired; to produce a signed release APK, drop a
+   `keystore.properties` (storeFile/storePassword/keyAlias/keyPassword) at the repo root or supply
+   it via CI secrets. → Provide/sanction a signing keystore.
+5. **Real-device QA.** Acceptance criteria in `USER_STORIES.md` need on-device validation across the
    `DEVICE_MATRIX.md` handsets (recording fidelity, lock-screen incoming UI, default-dialer behavior).
+   This is inherently a hardware step and cannot be done in CI.
 
 ## Decisions still open (from the original plan)
 - Recording retention window after successful upload (currently prune-on-success).
