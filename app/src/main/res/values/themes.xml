@@ -1,0 +1,4 @@
+<resources>
+    <!-- Base theme; Compose drives the actual Material 3 styling. -->
+    <style name="Theme.ClatosDialer" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
