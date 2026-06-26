@@ -3,6 +3,7 @@ package com.clatos.dialer.core.network.di
 import com.clatos.dialer.BuildConfig
 import com.clatos.dialer.core.network.AuthInterceptor
 import com.clatos.dialer.core.network.CrmApi
+import com.clatos.dialer.core.network.SessionAuthenticator
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import dagger.Module
 import dagger.Provides
@@ -28,7 +29,10 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttp(authInterceptor: AuthInterceptor): OkHttpClient {
+    fun provideOkHttp(
+        authInterceptor: AuthInterceptor,
+        sessionAuthenticator: SessionAuthenticator,
+    ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BODY
@@ -39,6 +43,7 @@ object NetworkModule {
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .addInterceptor(logging)
+            .authenticator(sessionAuthenticator)
             .build()
     }
 

@@ -8,51 +8,135 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.clatos.dialer.core.common.PermissionUtils
 
 /**
- * Guided onboarding: request the default-dialer role and all runtime permissions.
- * (US-2.1, US-3.1). Permission rationale UI is simplified for the scaffold.
+ * Guided onboarding (US-2.1, US-3.1): request the default-dialer role and all
+ * runtime permissions, each with rationale, and gate completion on the critical
+ * permissions. Statuses refresh whenever the screen resumes (e.g. returning
+ * from system settings) so re-prompting works.
  */
 @Composable
-fun OnboardingScreen(onComplete: () -> Unit) {
+fun OnboardingScreen(viewModel: OnboardingViewModel = hiltViewModel()) {
     val context = LocalContext.current
+
+    // Bumping this recomputes the granted/role checks below.
+    var refreshTick by remember { mutableIntStateOf(0) }
+    LifecycleResumeEffect(Unit) {
+        refreshTick++
+        onPauseOrDispose { }
+    }
+
+    val permissions = remember { PermissionUtils.required() }
+    // Keyed on refreshTick so statuses recompute after permission/role changes.
+    val statuses = remember(refreshTick) {
+        permissions.map { it to PermissionUtils.isGranted(context, it.permission) }
+    }
+    val criticalGranted = remember(refreshTick) { PermissionUtils.criticalGranted(context) }
+    val isDefaultDialer = remember(refreshTick) { isDefaultDialer(context) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
-    ) { /* handle grants; re-prompt for denials in a full build */ }
+    ) { refreshTick++ }
 
     val roleLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
-    ) { /* user returned from default-dialer prompt */ }
+    ) { refreshTick++ }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
     ) {
-        Text("Set up Clatos Dialer", modifier = Modifier.padding(bottom = 16.dp))
+        Text("Set up Clatos Dialer", fontWeight = FontWeight.Bold)
+        Text(
+            "Grant the permissions below and make Clatos your default phone app " +
+                "so calls can be placed, recorded, and logged to the CRM.",
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+
+        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            Column(Modifier.padding(16.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.padding(end = 8.dp)) {
+                        Text("Default phone app", fontWeight = FontWeight.Bold)
+                        Text("Required to record and manage calls.")
+                    }
+                    Text(if (isDefaultDialer) "✓" else "—")
+                }
+                OutlinedButton(
+                    onClick = { requestDefaultDialer(context, roleLauncher::launch) },
+                    modifier = Modifier.padding(top = 8.dp),
+                ) { Text(if (isDefaultDialer) "Set again" else "Set as default") }
+            }
+        }
+
+        statuses.forEach { (info, granted) ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(Modifier.padding(end = 8.dp)) {
+                    Text(info.label + if (info.critical) " (required)" else "", fontWeight = FontWeight.Bold)
+                    Text(info.rationale)
+                }
+                Text(if (granted) "✓" else "—")
+            }
+        }
 
         Button(
-            onClick = { permissionLauncher.launch(REQUIRED_PERMISSIONS) },
-            modifier = Modifier.padding(bottom = 8.dp),
+            onClick = { permissionLauncher.launch(PermissionUtils.allPermissionStrings()) },
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         ) { Text("Grant permissions") }
 
-        Button(
-            onClick = { requestDefaultDialer(context, roleLauncher::launch) },
-            modifier = Modifier.padding(bottom = 16.dp),
-        ) { Text("Set as default phone app") }
+        if (!criticalGranted) {
+            Text(
+                "Grant the required permissions to finish setup.",
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        if (!isDefaultDialer) {
+            Text(
+                "Recording needs Clatos to be your default phone app.",
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
 
-        Button(onClick = onComplete) { Text("Continue") }
+        Button(
+            onClick = { viewModel.completeOnboarding() },
+            enabled = criticalGranted,
+            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+        ) { Text("Finish setup") }
     }
+}
+
+private fun isDefaultDialer(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
+    val roleManager = context.getSystemService(RoleManager::class.java) ?: return false
+    return roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) &&
+        roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
 }
 
 private fun requestDefaultDialer(context: Context, launch: (Intent) -> Unit) {
@@ -65,16 +149,3 @@ private fun requestDefaultDialer(context: Context, launch: (Intent) -> Unit) {
         }
     }
 }
-
-private val REQUIRED_PERMISSIONS: Array<String> = buildList {
-    add(android.Manifest.permission.CALL_PHONE)
-    add(android.Manifest.permission.READ_PHONE_STATE)
-    add(android.Manifest.permission.READ_CALL_LOG)
-    add(android.Manifest.permission.READ_CONTACTS)
-    add(android.Manifest.permission.WRITE_CONTACTS)
-    add(android.Manifest.permission.RECORD_AUDIO)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        add(android.Manifest.permission.POST_NOTIFICATIONS)
-        add(android.Manifest.permission.READ_MEDIA_AUDIO)
-    }
-}.toTypedArray()

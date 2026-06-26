@@ -74,9 +74,19 @@ Output: `app/build/outputs/apk/debug/app-debug.apk` — sideload onto a test dev
 
 ## Status
 
-This is the **Sprint-0 scaffold**: architecture, navigation, DI, networking, Room, WorkManager sync,
-telephony service skeletons, the recording-engine abstraction, and stub Compose screens. Feature
-logic is filled in per the sprint plan in `docs/USER_STORIES.md`.
+- **Sprint 0 (done):** architecture, navigation, DI, networking, Room, WorkManager sync, telephony
+  service skeletons, recording-engine abstraction, stub screens.
+- **Sprint 1 (done):** CRM login + session validation (`GET /api/me`) + 401 handling + logout;
+  state-driven gating (login → onboarding → dialer); guided permission onboarding with rationale and
+  default-dialer role request; runtime-permission resilience on the dialer; settings screen; CI build.
+
+Remaining feature work follows the sprint plan in `docs/USER_STORIES.md` (dialer in-call UI →
+recording engine → call-log sync → contacts).
+
+## CI
+
+`.github/workflows/android-ci.yml` sets up JDK 17 + the Android SDK, generates the Gradle wrapper,
+runs `assembleDebug` + `lintDebug`, and uploads the debug APK as a build artifact on every push/PR.
 
 ## Open items to confirm
 

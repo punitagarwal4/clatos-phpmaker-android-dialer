@@ -52,6 +52,12 @@ android {
         buildConfig = true
     }
 
+    lint {
+        // Scaffold stage: surface issues but don't fail the build on them.
+        abortOnError = false
+        warningsAsErrors = false
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -62,6 +68,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 

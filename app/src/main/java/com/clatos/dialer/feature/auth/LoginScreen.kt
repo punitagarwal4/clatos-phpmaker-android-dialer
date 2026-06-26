@@ -22,14 +22,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun LoginScreen(
-    onLoggedIn: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    if (state is LoginUiState.Success) onLoggedIn()
+    // On success the SessionStore flips to authenticated and MainActivity's
+    // state-driven gating navigates to onboarding — no callback needed here.
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
