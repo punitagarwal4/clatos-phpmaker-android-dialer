@@ -36,7 +36,7 @@ class CallLogRepository @Inject constructor(
     ) {
         val details = call.details
         val rawNumber = details.handle?.schemeSpecificPart.orEmpty()
-        val isIncoming = details.callDirection == Call.Details.DIRECTION_INCOMING
+        val isIncoming = active.isIncoming
         val connectedAt = details.connectTimeMillis.takeIf { it > 0 } ?: active.startedAt
         val durationSec = ((System.currentTimeMillis() - connectedAt) / 1000).toInt().coerceAtLeast(0)
         val missed = isIncoming && details.connectTimeMillis <= 0

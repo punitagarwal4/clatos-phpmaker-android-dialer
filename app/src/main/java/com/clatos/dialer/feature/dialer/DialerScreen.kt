@@ -1,9 +1,6 @@
 package com.clatos.dialer.feature.dialer
 
 import android.Manifest
-import android.content.Context
-import android.net.Uri
-import android.telecom.TelecomManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,8 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.getSystemService
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.clatos.dialer.core.common.CallPlacer
 import com.clatos.dialer.core.common.PermissionUtils
 
 /**
@@ -78,18 +75,9 @@ fun DialerScreen(
             }
         }
         Button(
-            onClick = { placeCall(context, number) },
+            onClick = { CallPlacer.placeCall(context, number) },
             enabled = canCall && number.isNotBlank(),
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
         ) { Text("Call") }
-    }
-}
-
-private fun placeCall(context: Context, number: String) {
-    if (number.isBlank()) return
-    val telecom = context.getSystemService<TelecomManager>() ?: return
-    runCatching {
-        // Requires CALL_PHONE permission (checked before enabling the button).
-        telecom.placeCall(Uri.fromParts("tel", number, null), null)
     }
 }

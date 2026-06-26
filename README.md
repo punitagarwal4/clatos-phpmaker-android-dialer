@@ -79,9 +79,13 @@ Output: `app/build/outputs/apk/debug/app-debug.apk` — sideload onto a test dev
 - **Sprint 1 (done):** CRM login + session validation (`GET /api/me`) + 401 handling + logout;
   state-driven gating (login → onboarding → dialer); guided permission onboarding with rationale and
   default-dialer role request; runtime-permission resilience on the dialer; settings screen; CI build.
+- **Sprint 2 (done):** dialer in-call UI — `CallManager` (call state, answer/reject/hangup,
+  mute/speaker/DTMF, caller-ID via CRM cache + device PhoneLookup); `InCallService` driving it;
+  `InCallActivity` shown over the lock screen (full-screen-intent notification for incoming calls);
+  tap-to-call from the dialpad, contacts, and history.
 
-Remaining feature work follows the sprint plan in `docs/USER_STORIES.md` (dialer in-call UI →
-recording engine → call-log sync → contacts).
+Remaining feature work follows the sprint plan in `docs/USER_STORIES.md` (recording engine →
+call-log sync → contacts).
 
 ## CI
 

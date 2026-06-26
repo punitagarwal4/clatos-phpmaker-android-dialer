@@ -3,4 +3,6 @@
     <string name="recording_channel_name">Call Recording</string>
     <string name="recording_notification_title">Call in progress</string>
     <string name="recording_notification_text">Recording active</string>
+    <string name="call_channel_name">Ongoing calls</string>
+    <string name="incoming_call_title">Incoming call</string>
 </resources>

@@ -1,6 +1,7 @@
 package com.clatos.dialer.telephony
 
 import android.telecom.Call
+import android.telecom.CallAudioState
 import android.telecom.InCallService
 import com.clatos.dialer.recording.CallRecorder
 import com.clatos.dialer.recording.RecordingService
@@ -15,39 +16,73 @@ import javax.inject.Inject
 
 /**
  * The app's in-call service. Because the app holds ROLE_DIALER, the system
- * routes calls here. We observe call state to (a) drive the in-call UI and
- * (b) start/stop recording and persist a CallLog entry for CRM sync.
+ * routes calls here. It feeds call state into [CallManager] (which the in-call
+ * UI observes), provides audio control, launches the in-call UI, and drives
+ * recording + call-log capture.
  */
 @AndroidEntryPoint
 class ClatosInCallService : InCallService() {
 
+    @Inject lateinit var callManager: CallManager
     @Inject lateinit var callRecorder: CallRecorder
     @Inject lateinit var callLogRepository: CallLogRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    // Tracks per-call metadata until the call ends and we can persist it.
     private val activeCalls = mutableMapOf<Call, ActiveCall>()
+
+    private val audioController = object : CallManager.AudioController {
+        override fun setMuted(muted: Boolean) = this@ClatosInCallService.setMuted(muted)
+        override fun setAudioRoute(route: Int) = this@ClatosInCallService.setAudioRoute(route)
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        callManager.attachAudioController(audioController)
+    }
+
+    override fun onDestroy() {
+        callManager.detachAudioController()
+        super.onDestroy()
+    }
+
+    override fun onCallAudioStateChanged(audioState: CallAudioState) {
+        super.onCallAudioStateChanged(audioState)
+        callManager.onAudioStateChanged(audioState.isMuted, audioState.route)
+    }
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
-        val clientId = UUID.randomUUID().toString()
-        activeCalls[call] = ActiveCall(clientCallId = clientId, startedAt = System.currentTimeMillis())
-        InCallBus.publish(call) // expose to the Compose in-call UI
+        @Suppress("DEPRECATION")
+        val isIncoming = call.state == Call.STATE_RINGING
+        activeCalls[call] = ActiveCall(UUID.randomUUID().toString(), System.currentTimeMillis(), isIncoming)
+
+        callManager.onCallAdded(call, isIncoming)
         call.registerCallback(callback)
-        handleState(call, call.details.state)
+
+        // Surface the UI: full-screen notification for incoming, direct launch otherwise.
+        if (isIncoming) {
+            CallNotifications.showIncoming(this, callManager.state.value?.let {
+                it.displayName ?: it.number
+            }.orEmpty())
+        } else {
+            CallNotifications.launchInCall(this)
+        }
+
+        @Suppress("DEPRECATION")
+        handleState(call, call.state)
     }
 
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
         call.unregisterCallback(callback)
+        CallNotifications.cancel(this)
         val active = activeCalls.remove(call) ?: return
         RecordingService.stop(this)
+        callManager.onCallRemoved()
         scope.launch {
             val recording = callRecorder.onCallEnded()
             callLogRepository.persistEndedCall(call, active, recording)
         }
-        InCallBus.clear(call)
     }
 
     private val callback = object : Call.Callback() {
@@ -55,8 +90,10 @@ class ClatosInCallService : InCallService() {
     }
 
     private fun handleState(call: Call, state: Int) {
-        InCallBus.publish(call)
+        callManager.onStateChanged(call)
         if (state == Call.STATE_ACTIVE) {
+            CallNotifications.cancel(this)
+            CallNotifications.launchInCall(this)
             val active = activeCalls[call] ?: return
             if (!active.recordingStarted) {
                 active.recordingStarted = true
@@ -70,6 +107,7 @@ class ClatosInCallService : InCallService() {
     data class ActiveCall(
         val clientCallId: String,
         val startedAt: Long,
+        val isIncoming: Boolean,
         var recordingStarted: Boolean = false,
     )
 }

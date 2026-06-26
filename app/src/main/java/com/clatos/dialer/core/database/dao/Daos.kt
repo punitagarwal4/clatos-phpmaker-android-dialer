@@ -39,6 +39,9 @@ interface ContactDao {
 
     @Query("SELECT * FROM contacts WHERE id = :id LIMIT 1")
     suspend fun byId(id: String): ContactEntity?
+
+    @Query("SELECT * FROM contacts WHERE normalizedNumber = :normalized LIMIT 1")
+    suspend fun byNormalizedNumber(normalized: String): ContactEntity?
 }
 
 @Dao
