@@ -27,6 +27,9 @@ interface CallLogDao {
 
     @Query("UPDATE call_logs SET syncStatus = :status, attempts = attempts + 1 WHERE id = :id")
     suspend fun markAttempt(id: Long, status: SyncStatus = SyncStatus.FAILED)
+
+    @Query("SELECT * FROM call_logs WHERE normalizedNumber = :normalized ORDER BY startedAt DESC LIMIT 20")
+    suspend fun recentForNumber(normalized: String): List<CallLogEntity>
 }
 
 @Dao
@@ -36,6 +39,9 @@ interface ContactDao {
 
     @Query("SELECT * FROM contacts ORDER BY name COLLATE NOCASE ASC")
     fun observeAll(): Flow<List<ContactEntity>>
+
+    @Query("SELECT * FROM contacts ORDER BY name COLLATE NOCASE ASC")
+    suspend fun getAll(): List<ContactEntity>
 
     @Query("SELECT * FROM contacts WHERE id = :id LIMIT 1")
     suspend fun byId(id: String): ContactEntity?

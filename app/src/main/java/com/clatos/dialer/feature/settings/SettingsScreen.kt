@@ -40,6 +40,16 @@ fun SettingsScreen(
         Text("Settings", fontWeight = FontWeight.Bold)
         Text("Signed in as: ${state.agentName.ifBlank { "—" }}")
         Text("Pending uploads: ${state.pendingSync}")
+        Text("Recording: ${state.recordingStrategy}" + if (state.recordingDegraded) " (limited on this device)" else "")
+        if (state.deviceInfo.isNotBlank()) {
+            Text(state.deviceInfo)
+        }
+
+        OutlinedButton(
+            onClick = viewModel::retestRecording,
+            enabled = !state.testing,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        ) { Text(if (state.testing) "Testing…" else "Re-run recording test") }
 
         Button(
             onClick = { showLogoutDialog = true },

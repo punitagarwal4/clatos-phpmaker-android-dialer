@@ -1,11 +1,14 @@
 package com.clatos.dialer.navigation
 
+import android.net.Uri
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.clatos.dialer.feature.auth.LoginScreen
 import com.clatos.dialer.feature.auth.SessionState
 import com.clatos.dialer.feature.calllog.CallLogScreen
@@ -26,7 +29,8 @@ object Routes {
     const val CONTACT_CREATE = "contacts/create"
     const val CONTACT_PROFILE = "contacts/{contactId}"
     const val SETTINGS = "settings"
-    fun contactProfile(contactId: String) = "contacts/$contactId"
+    // Encode so ids containing ':' or '/' (e.g. device lookup keys) stay one segment.
+    fun contactProfile(contactId: String) = "contacts/${Uri.encode(contactId)}"
 }
 
 /** Maps the session state to the top-level destination that gates the app. */
@@ -70,6 +74,9 @@ fun AppNavHost(
         composable(Routes.CONTACT_CREATE) {
             ContactCreateScreen(onSaved = { navController.popBackStack() })
         }
-        composable(Routes.CONTACT_PROFILE) { ContactProfileScreen() }
+        composable(
+            Routes.CONTACT_PROFILE,
+            arguments = listOf(navArgument("contactId") { type = NavType.StringType }),
+        ) { ContactProfileScreen() }
     }
 }

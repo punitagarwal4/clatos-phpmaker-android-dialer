@@ -32,11 +32,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CallLogViewModel @Inject constructor(
-    repository: CallLogRepository,
+    private val repository: CallLogRepository,
 ) : ViewModel() {
     val history: StateFlow<List<CallLogEntity>> =
         repository.observeHistory()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun syncNow() = repository.enqueueSync()
 }
 
 @Composable
@@ -44,7 +46,14 @@ fun CallLogScreen(viewModel: CallLogViewModel = hiltViewModel()) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     val context = LocalContext.current
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Call history", modifier = Modifier.padding(bottom = 8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Call history")
+            OutlinedButton(onClick = viewModel::syncNow) { Text("Sync now") }
+        }
         LazyColumn {
             items(history) { entry ->
                 Row(

@@ -33,9 +33,12 @@ class RecordingSelfTest @Inject constructor(
         MediaRecorderEngine(context, RecordingStrategy.MIC, MediaRecorder.AudioSource.MIC),
     )
 
-    /** Returns the selected strategy, persisting the capability row. */
-    suspend fun run(): RecordingStrategy {
-        existingForThisOs()?.let { return RecordingStrategy.valueOf(it.selectedStrategy) }
+    /** Returns the selected strategy, persisting the capability row. Pass
+     *  [force] = true to re-probe even if a result already exists for this OS. */
+    suspend fun run(force: Boolean = false): RecordingStrategy {
+        if (!force) {
+            existingForThisOs()?.let { return RecordingStrategy.valueOf(it.selectedStrategy) }
+        }
 
         var selected = RecordingStrategy.NONE
         for (engine in candidates()) {

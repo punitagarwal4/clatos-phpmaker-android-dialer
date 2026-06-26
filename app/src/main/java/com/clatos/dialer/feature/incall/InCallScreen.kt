@@ -61,6 +61,9 @@ fun InCallScreen(
             text = statusLine(call),
             modifier = Modifier.padding(top = 8.dp),
         )
+        if (call.isRecording) {
+            Text("● Recording", modifier = Modifier.padding(top = 4.dp))
+        }
 
         Spacer(Modifier.weight(0.7f))
 

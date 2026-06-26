@@ -1,7 +1,9 @@
 package com.clatos.dialer.recording
 
+import android.Manifest
 import android.content.Context
 import android.media.MediaRecorder
+import com.clatos.dialer.core.common.PermissionUtils
 import com.clatos.dialer.core.database.dao.RecordingCapabilityDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -22,6 +24,7 @@ class CallRecorder @Inject constructor(
     private var currentFile: File? = null
 
     suspend fun onCallConnected(callId: String): Boolean {
+        if (!PermissionUtils.isGranted(context, Manifest.permission.RECORD_AUDIO)) return false
         val strategy = capabilityDao.get()?.selectedStrategy
             ?.let { runCatching { RecordingStrategy.valueOf(it) }.getOrNull() }
             ?: RecordingStrategy.NONE

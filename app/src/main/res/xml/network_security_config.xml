@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Enforce TLS for all CRM traffic; no cleartext by default. If a staging/dev
+  CRM must be reached over http, add a <domain-config cleartextTrafficPermitted="true">
+  entry for that host only — do not relax the base config.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

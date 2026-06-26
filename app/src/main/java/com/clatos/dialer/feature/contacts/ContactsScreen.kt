@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,17 +20,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.clatos.dialer.core.common.CallPlacer
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import com.clatos.dialer.core.database.entity.ContactEntity
+import com.clatos.dialer.core.common.CallPlacer
 import com.clatos.dialer.sync.ContactRepository
+import com.clatos.dialer.sync.UnifiedContact
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -37,15 +38,30 @@ import javax.inject.Inject
 class ContactsViewModel @Inject constructor(
     private val repository: ContactRepository,
 ) : ViewModel() {
-    // NOTE: device contacts (ContactsContract) are merged in a full build; the
-    // scaffold shows cached CRM contacts. Deletion is intentionally unsupported.
-    val contacts: StateFlow<List<ContactEntity>> =
-        repository.observeCachedCrmContacts()
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query.asStateFlow()
+
+    private val _contacts = MutableStateFlow<List<UnifiedContact>>(emptyList())
+    val contacts: StateFlow<List<UnifiedContact>> = _contacts.asStateFlow()
 
     init { refresh() }
 
-    fun refresh() = viewModelScope.launch { repository.syncCrmContacts() }
+    fun onQueryChange(value: String) {
+        _query.value = value
+        reload()
+    }
+
+    /** Pulls the latest CRM contacts then rebuilds the unified list. */
+    fun refresh() {
+        viewModelScope.launch {
+            repository.syncCrmContacts()
+            reload()
+        }
+    }
+
+    private fun reload() {
+        viewModelScope.launch { _contacts.value = repository.loadUnified(_query.value) }
+    }
 }
 
 @Composable
@@ -55,9 +71,24 @@ fun ContactsScreen(
     viewModel: ContactsViewModel = hiltViewModel(),
 ) {
     val contacts by viewModel.contacts.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Button(onClick = onCreate, modifier = Modifier.padding(bottom = 8.dp)) { Text("New contact") }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Contacts")
+            Button(onClick = onCreate) { Text("New") }
+        }
+        OutlinedTextField(
+            value = query,
+            onValueChange = viewModel::onQueryChange,
+            label = { Text("Search") },
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        )
         LazyColumn {
             items(contacts) { contact ->
                 Row(
@@ -71,9 +102,9 @@ fun ContactsScreen(
                             .clickable { onOpen(contact.id) },
                     ) {
                         Text(contact.name)
-                        Text("${contact.primaryNumber ?: ""} • ${contact.source}")
+                        Text("${contact.number ?: ""} • ${sourceLabel(contact)}")
                     }
-                    contact.primaryNumber?.let { number ->
+                    contact.number?.takeIf { it.isNotBlank() }?.let { number ->
                         OutlinedButton(onClick = { CallPlacer.placeCall(context, number) }) {
                             Text("Call")
                         }
@@ -83,4 +114,9 @@ fun ContactsScreen(
             }
         }
     }
+}
+
+private fun sourceLabel(contact: UnifiedContact): String = when {
+    contact.alsoInOtherSource -> "CRM + device"
+    else -> contact.source.name.lowercase().replaceFirstChar { it.uppercase() }
 }

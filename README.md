@@ -83,9 +83,19 @@ Output: `app/build/outputs/apk/debug/app-debug.apk` — sideload onto a test dev
   mute/speaker/DTMF, caller-ID via CRM cache + device PhoneLookup); `InCallService` driving it;
   `InCallActivity` shown over the lock screen (full-screen-intent notification for incoming calls);
   tap-to-call from the dialpad, contacts, and history.
+- **Sprint 3 (done):** recording engine end-to-end — first-run self-test wired (app start +
+  onboarding), capability persisted and reported to the CRM (`DiagnosticsReporter`), mic-permission
+  guard, recording indicator in the in-call UI, recording capability shown in Settings.
+- **Sprint 4 (done):** call-log sync hardening — exponential backoff, periodic safety-net sync,
+  manual "Sync now", offline queue + retention pruning (already in the worker).
+- **Sprint 5 (done):** unified contacts — device (ContactsContract) + CRM merged & deduped by number,
+  search, live CRM profile fetch (`GET /api/contacts/{id}`) with recent local calls, create pushes to
+  CRM; deletion disabled by policy.
+- **Sprint 6 (done):** hardening — network security config (TLS-only, no cleartext), encrypted session
+  storage, manual recording re-test + telemetry, device compatibility matrix (`docs/DEVICE_MATRIX.md`).
 
-Remaining feature work follows the sprint plan in `docs/USER_STORIES.md` (recording engine →
-call-log sync → contacts).
+All planned sprints (per `docs/USER_STORIES.md`) are implemented. Remaining work is real-device QA,
+the PHPMaker API mapping (`docs/API_CONTRACT.md`), and release signing for distribution.
 
 ## CI
 

@@ -99,6 +99,7 @@ class CallSyncWorker @AssistedInject constructor(
 
     companion object {
         const val NAME = "call_sync"
+        const val PERIODIC_NAME = "call_sync_periodic"
 
         fun constraints(): Constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)

@@ -2,8 +2,11 @@ package com.clatos.dialer.sync
 
 import android.content.Context
 import android.telecom.Call
+import androidx.work.BackoffPolicy
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.clatos.dialer.core.common.PhoneNumberUtils
 import com.clatos.dialer.core.database.dao.CallLogDao
@@ -15,6 +18,7 @@ import com.clatos.dialer.recording.RecordingResult
 import com.clatos.dialer.telephony.ClatosInCallService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -61,11 +65,27 @@ class CallLogRepository @Inject constructor(
         enqueueSync()
     }
 
+    /** Kicks an immediate (network-gated) upload attempt with exponential backoff. */
     fun enqueueSync() {
         val request = OneTimeWorkRequestBuilder<CallSyncWorker>()
             .setConstraints(CallSyncWorker.constraints())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context)
-            .enqueueUniqueWork(CallSyncWorker.NAME, ExistingWorkPolicy.KEEP, request)
+            .enqueueUniqueWork(CallSyncWorker.NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+    }
+
+    /** Periodic safety-net sync so queued logs drain even with no new calls. */
+    fun schedulePeriodicSync() {
+        val request = PeriodicWorkRequestBuilder<CallSyncWorker>(6, TimeUnit.HOURS)
+            .setConstraints(CallSyncWorker.constraints())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniquePeriodicWork(
+                CallSyncWorker.PERIODIC_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                request,
+            )
     }
 }

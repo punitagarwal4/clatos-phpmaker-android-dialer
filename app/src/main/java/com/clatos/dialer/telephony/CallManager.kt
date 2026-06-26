@@ -32,6 +32,7 @@ data class CallUiState(
     val isIncoming: Boolean,
     val isMuted: Boolean = false,
     val isSpeaker: Boolean = false,
+    val isRecording: Boolean = false,
     /** Wall-clock millis when the call became active, for the duration timer. */
     val connectedAtMillis: Long? = null,
 )
@@ -91,6 +92,10 @@ class CallManager @Inject constructor(
     fun onCallRemoved() {
         call = null
         _state.value = null
+    }
+
+    fun setRecording(recording: Boolean) {
+        _state.value = _state.value?.copy(isRecording = recording)
     }
 
     fun onAudioStateChanged(muted: Boolean, route: Int) {

@@ -98,7 +98,10 @@ class ClatosInCallService : InCallService() {
             if (!active.recordingStarted) {
                 active.recordingStarted = true
                 RecordingService.start(this)
-                scope.launch { callRecorder.onCallConnected(active.clientCallId) }
+                scope.launch {
+                    val ok = callRecorder.onCallConnected(active.clientCallId)
+                    callManager.setRecording(ok)
+                }
             }
         }
     }

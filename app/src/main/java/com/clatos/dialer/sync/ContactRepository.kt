@@ -1,28 +1,40 @@
 package com.clatos.dialer.sync
 
 import com.clatos.dialer.core.common.PhoneNumberUtils
+import com.clatos.dialer.core.contacts.DeviceContactsDataSource
+import com.clatos.dialer.core.database.dao.CallLogDao
 import com.clatos.dialer.core.database.dao.ContactDao
+import com.clatos.dialer.core.database.entity.CallLogEntity
 import com.clatos.dialer.core.database.entity.ContactEntity
 import com.clatos.dialer.core.database.entity.ContactSource
 import com.clatos.dialer.core.network.CrmApi
 import com.clatos.dialer.core.network.dto.ContactDto
 import com.clatos.dialer.core.network.dto.CreateContactRequest
-import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** A contact shown in the unified list (device + CRM, deduped by number). */
+data class UnifiedContact(
+    val id: String,            // "crm:{id}" or "device:{lookupKey}"
+    val name: String,
+    val number: String?,
+    val source: ContactSource,
+    val crmId: Long?,
+    val alsoInOtherSource: Boolean = false,
+)
+
 /**
- * Provides the unified contacts view. CRM contacts are cached in Room (synced
- * incrementally); device contacts are read live via ContactsContract (TODO)
- * and merged/deduped by normalized number. Deletion is intentionally unsupported.
+ * Unified contacts: CRM contacts are cached in Room (synced from the API) and
+ * merged with device contacts (ContactsContract), deduped by normalized number.
+ * Deletion is intentionally unsupported.
  */
 @Singleton
 class ContactRepository @Inject constructor(
     private val crmApi: CrmApi,
     private val contactDao: ContactDao,
+    private val callLogDao: CallLogDao,
+    private val deviceContacts: DeviceContactsDataSource,
 ) {
-    fun observeCachedCrmContacts(): Flow<List<ContactEntity>> = contactDao.observeAll()
-
     /** Pull CRM contacts (optionally incremental) into the local cache. */
     suspend fun syncCrmContacts(since: String? = null): Result<Int> = runCatching {
         val response = crmApi.contacts(since = since)
@@ -31,7 +43,58 @@ class ContactRepository @Inject constructor(
         entities.size
     }
 
+    /** Merged device + CRM contacts, deduped by number, filtered by [query]. */
+    suspend fun loadUnified(query: String = ""): List<UnifiedContact> {
+        val crm = contactDao.getAll()
+        val device = deviceContacts.query()
+
+        val byNumber = LinkedHashMap<String, UnifiedContact>()
+        // CRM takes precedence so opening a match shows the CRM profile.
+        crm.forEach { entity ->
+            val key = entity.normalizedNumber?.takeIf { it.isNotBlank() } ?: "crm:${entity.crmId}"
+            byNumber[key] = UnifiedContact(
+                id = entity.id,
+                name = entity.name,
+                number = entity.primaryNumber,
+                source = ContactSource.CRM,
+                crmId = entity.crmId,
+            )
+        }
+        device.forEach { dc ->
+            val key = PhoneNumberUtils.normalize(dc.number).takeIf { it.isNotBlank() }
+                ?: "device:${dc.lookupKey}"
+            val existing = byNumber[key]
+            if (existing == null) {
+                byNumber[key] = UnifiedContact(
+                    id = "device:${dc.lookupKey}",
+                    name = dc.name,
+                    number = dc.number,
+                    source = ContactSource.DEVICE,
+                    crmId = null,
+                )
+            } else if (existing.source == ContactSource.CRM) {
+                byNumber[key] = existing.copy(alsoInOtherSource = true)
+            }
+        }
+
+        val q = query.trim()
+        return byNumber.values
+            .filter {
+                q.isBlank() ||
+                    it.name.contains(q, ignoreCase = true) ||
+                    (it.number?.contains(q) == true)
+            }
+            .sortedBy { it.name.lowercase() }
+    }
+
     suspend fun profile(crmId: Long): Result<ContactDto> = runCatching { crmApi.contact(crmId) }
+
+    /** Recent local call history with a given number (for the profile screen). */
+    suspend fun recentCalls(number: String?): List<CallLogEntity> {
+        val normalized = PhoneNumberUtils.normalize(number)
+        if (normalized.isBlank()) return emptyList()
+        return callLogDao.recentForNumber(normalized)
+    }
 
     suspend fun create(name: String, phone: String, company: String?, notes: String?): Result<ContactDto> =
         runCatching {
