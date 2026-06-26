@@ -12,6 +12,9 @@ view** of device + CRM contacts; agents can create and open (CRM profile) contac
 - [`docs/USER_STORIES.md`](docs/USER_STORIES.md) — agile backlog: epics, stories, acceptance criteria, sprint plan.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — modules, tech stack, recording strategy, data model, security.
 - [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) — the CRM REST endpoints the app expects (confirm vs real API).
+- [`docs/PRODUCTION_READINESS.md`](docs/PRODUCTION_READINESS.md) — step-by-step guide to take this to production.
+- [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) — what's done vs. what needs external input.
+- [`docs/DEVICE_MATRIX.md`](docs/DEVICE_MATRIX.md) — per-device recording compatibility tracker.
 
 ## ⚠️ Recording reality (read this)
 
