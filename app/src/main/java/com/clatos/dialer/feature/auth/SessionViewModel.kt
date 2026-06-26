@@ -7,13 +7,17 @@ import com.clatos.dialer.sync.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** High-level app state used to pick the start destination and gate features. */
-enum class SessionState { Loading, Unauthenticated, NeedsOnboarding, Ready }
+/**
+ * Top-level app state. Authentication gates the app; once authenticated, the
+ * PermissionGate (not this state) decides whether the agent reaches the dialer,
+ * by requiring all runtime permissions + the default-dialer role.
+ */
+enum class SessionState { Loading, Unauthenticated, Authenticated }
 
 @HiltViewModel
 class SessionViewModel @Inject constructor(
@@ -22,13 +26,9 @@ class SessionViewModel @Inject constructor(
 ) : ViewModel() {
 
     val state: StateFlow<SessionState> =
-        combine(sessionStore.isAuthenticated, sessionStore.onboardingComplete) { authed, onboarded ->
-            when {
-                !authed -> SessionState.Unauthenticated
-                !onboarded -> SessionState.NeedsOnboarding
-                else -> SessionState.Ready
-            }
-        }.stateIn(viewModelScope, SharingStarted.Eagerly, SessionState.Loading)
+        sessionStore.isAuthenticated
+            .map { authed -> if (authed) SessionState.Authenticated else SessionState.Unauthenticated }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, SessionState.Loading)
 
     init {
         // Validate the stored token on launch; clears the session on a 401 so

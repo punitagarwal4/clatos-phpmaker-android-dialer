@@ -39,10 +39,15 @@ object PermissionUtils {
     fun isGranted(context: Context, permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-    /** True when every critical permission is granted (gates onboarding completion). */
+    /** True when EVERY required runtime permission is granted (hard app gate). */
+    fun allGranted(context: Context): Boolean =
+        required().all { isGranted(context, it.permission) }
+
+    /** Required permissions that are still not granted. */
+    fun missing(context: Context): List<PermissionInfo> =
+        required().filter { !isGranted(context, it.permission) }
+
+    /** True when every critical permission is granted. */
     fun criticalGranted(context: Context): Boolean =
         required().filter { it.critical }.all { isGranted(context, it.permission) }
-
-    fun missingCritical(context: Context): List<PermissionInfo> =
-        required().filter { it.critical && !isGranted(context, it.permission) }
 }

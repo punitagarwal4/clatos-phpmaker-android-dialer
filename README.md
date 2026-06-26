@@ -80,8 +80,12 @@ Output: `app/build/outputs/apk/debug/app-debug.apk` — sideload onto a test dev
 - **Sprint 0 (done):** architecture, navigation, DI, networking, Room, WorkManager sync, telephony
   service skeletons, recording-engine abstraction, stub screens.
 - **Sprint 1 (done):** CRM login + session validation (`GET /api/me`) + 401 handling + logout;
-  state-driven gating (login → onboarding → dialer); guided permission onboarding with rationale and
-  default-dialer role request; runtime-permission resilience on the dialer; settings screen; CI build.
+  gating (login → **hard permission gate** → dialer); settings screen; CI build.
+- **Permission gate (non-MDM):** the app is **locked until every required runtime permission AND the
+  default-dialer role are granted**. A guided screen walks the user through each one with a rationale
+  and an Allow button, shows "open Settings" instructions for permanently-denied permissions, and
+  re-checks on every resume (granting/revoking outside the app is reflected immediately). MDM
+  customers can instead auto-grant these via managed configuration.
 - **Sprint 2 (done):** dialer in-call UI — `CallManager` (call state, answer/reject/hangup,
   mute/speaker/DTMF, caller-ID via CRM cache + device PhoneLookup); `InCallService` driving it;
   `InCallActivity` shown over the lock screen (full-screen-intent notification for incoming calls);
