@@ -16,6 +16,7 @@ import javax.inject.Inject
 data class ProfileUiState(
     val loading: Boolean = true,
     val name: String = "",
+    val number: String? = null,
     val fields: List<Pair<String, String>> = emptyList(),
     val recentCalls: List<CallLogEntity> = emptyList(),
     val isCrm: Boolean = false,
@@ -62,6 +63,7 @@ class ContactProfileViewModel @Inject constructor(
                         loading = false,
                         isCrm = true,
                         name = dto.name,
+                        number = number,
                         fields = buildList {
                             number?.let { add("Phone" to it) }
                             dto.email?.let { add("Email" to it) }

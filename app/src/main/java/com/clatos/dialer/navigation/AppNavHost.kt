@@ -50,20 +50,24 @@ fun AppNavHost(
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
             )
         }
-        composable(Routes.CALL_LOG) { CallLogScreen() }
+        composable(Routes.CALL_LOG) { CallLogScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
         composable(Routes.CONTACTS) {
             ContactsScreen(
                 onCreate = { navController.navigate(Routes.CONTACT_CREATE) },
                 onOpen = { id -> navController.navigate(Routes.contactProfile(id)) },
+                onBack = { navController.popBackStack() },
             )
         }
         composable(Routes.CONTACT_CREATE) {
-            ContactCreateScreen(onSaved = { navController.popBackStack() })
+            ContactCreateScreen(
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
         }
         composable(
             Routes.CONTACT_PROFILE,
             arguments = listOf(navArgument("contactId") { type = NavType.StringType }),
-        ) { ContactProfileScreen() }
+        ) { ContactProfileScreen(onBack = { navController.popBackStack() }) }
     }
 }

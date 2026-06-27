@@ -17,8 +17,10 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ClatosDatabase =
+        // Only destroy on downgrade (rare). On upgrade, add real Migrations so
+        // un-uploaded call logs in the offline queue are never silently wiped.
         Room.databaseBuilder(context, ClatosDatabase::class.java, "clatos.db")
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigrationOnDowngrade()
             .build()
 
     @Provides fun callLogDao(db: ClatosDatabase) = db.callLogDao()

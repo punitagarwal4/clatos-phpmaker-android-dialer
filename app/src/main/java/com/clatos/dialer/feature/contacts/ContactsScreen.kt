@@ -2,6 +2,7 @@ package com.clatos.dialer.feature.contacts
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,16 +10,26 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -34,84 +45,119 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class ContactsUiState(
+    val query: String = "",
+    val contacts: List<UnifiedContact> = emptyList(),
+    val loading: Boolean = true,
+    val error: String? = null,
+)
+
 @HiltViewModel
 class ContactsViewModel @Inject constructor(
     private val repository: ContactRepository,
 ) : ViewModel() {
-    private val _query = MutableStateFlow("")
-    val query: StateFlow<String> = _query.asStateFlow()
-
-    private val _contacts = MutableStateFlow<List<UnifiedContact>>(emptyList())
-    val contacts: StateFlow<List<UnifiedContact>> = _contacts.asStateFlow()
+    private val _state = MutableStateFlow(ContactsUiState())
+    val state: StateFlow<ContactsUiState> = _state.asStateFlow()
 
     init { refresh() }
 
     fun onQueryChange(value: String) {
-        _query.value = value
+        _state.value = _state.value.copy(query = value)
         reload()
     }
 
-    /** Pulls the latest CRM contacts then rebuilds the unified list. */
     fun refresh() {
+        _state.value = _state.value.copy(loading = true, error = null)
         viewModelScope.launch {
             repository.syncCrmContacts()
+                .onFailure { _state.value = _state.value.copy(error = "Couldn't sync CRM contacts") }
             reload()
         }
     }
 
     private fun reload() {
-        viewModelScope.launch { _contacts.value = repository.loadUnified(_query.value) }
+        viewModelScope.launch {
+            val list = repository.loadUnified(_state.value.query)
+            _state.value = _state.value.copy(contacts = list, loading = false)
+        }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactsScreen(
     onCreate: () -> Unit,
     onOpen: (String) -> Unit,
+    onBack: () -> Unit,
     viewModel: ContactsViewModel = hiltViewModel(),
 ) {
-    val contacts by viewModel.contacts.collectAsStateWithLifecycle()
-    val query by viewModel.query.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Contacts")
-            Button(onClick = onCreate) { Text("New") }
-        }
-        OutlinedTextField(
-            value = query,
-            onValueChange = viewModel::onQueryChange,
-            label = { Text("Search") },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        )
-        LazyColumn {
-            items(contacts) { contact ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onOpen(contact.id) },
-                    ) {
-                        Text(contact.name)
-                        Text("${contact.number ?: ""} • ${sourceLabel(contact)}")
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Contacts") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                    contact.number?.takeIf { it.isNotBlank() }?.let { number ->
-                        OutlinedButton(onClick = { CallPlacer.placeCall(context, number) }) {
-                            Text("Call")
-                        }
+                },
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onCreate) {
+                Icon(Icons.Filled.Add, contentDescription = "New contact")
+            }
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
+            OutlinedTextField(
+                value = state.query,
+                onValueChange = viewModel::onQueryChange,
+                label = { Text("Search") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            )
+            state.error?.let { Text(it, modifier = Modifier.padding(bottom = 8.dp)) }
+
+            when {
+                state.loading && state.contacts.isEmpty() ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                state.contacts.isEmpty() ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(if (state.query.isBlank()) "No contacts yet" else "No matches")
+                    }
+                else -> LazyColumn {
+                    items(state.contacts, key = { it.id }) { contact ->
+                        ContactRow(
+                            contact = contact,
+                            onOpen = { onOpen(contact.id) },
+                            onCall = { contact.number?.let { CallPlacer.placeCall(context, it) } },
+                        )
+                        HorizontalDivider()
                     }
                 }
-                HorizontalDivider()
             }
+        }
+    }
+}
+
+@Composable
+private fun ContactRow(contact: UnifiedContact, onOpen: () -> Unit, onCall: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f).clickable { onOpen() }) {
+            Text(contact.name, fontWeight = FontWeight.Bold)
+            Text("${contact.number ?: ""} · ${sourceLabel(contact)}")
+        }
+        if (!contact.number.isNullOrBlank()) {
+            OutlinedButton(onClick = onCall) { Text("Call") }
         }
     }
 }

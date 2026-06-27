@@ -3,6 +3,7 @@ package com.clatos.dialer.core.network.di
 import com.clatos.dialer.BuildConfig
 import com.clatos.dialer.core.network.AuthInterceptor
 import com.clatos.dialer.core.network.CrmApi
+import com.clatos.dialer.core.network.HostSelectionInterceptor
 import com.clatos.dialer.core.network.SessionAuthenticator
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import dagger.Module
@@ -30,6 +31,7 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttp(
+        hostSelectionInterceptor: HostSelectionInterceptor,
         authInterceptor: AuthInterceptor,
         sessionAuthenticator: SessionAuthenticator,
     ): OkHttpClient {
@@ -41,6 +43,8 @@ object NetworkModule {
             }
         }
         return OkHttpClient.Builder()
+            // Host rewrite first so the tenant URL applies to every request.
+            .addInterceptor(hostSelectionInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(logging)
             .authenticator(sessionAuthenticator)

@@ -13,9 +13,24 @@ class AuthRepository @Inject constructor(
     private val sessionStore: SessionStore,
     private val callLogDao: CallLogDao,
 ) {
-    suspend fun login(username: String, password: String): Result<Unit> = runCatching {
+    fun currentBaseUrl(): String? = sessionStore.currentBaseUrl()
+
+    suspend fun login(serverUrl: String, username: String, password: String): Result<Unit> = runCatching {
+        // Persist the tenant URL FIRST so the host interceptor targets it for the
+        // login call itself.
+        sessionStore.setBaseUrl(normalizeUrl(serverUrl))
         val response = crmApi.login(LoginRequest(username, password))
         sessionStore.save(response.token, response.user.id, response.user.name)
+    }
+
+    /** Ensures a usable base URL: adds https:// if no scheme, and a trailing slash. */
+    private fun normalizeUrl(raw: String): String {
+        var url = raw.trim()
+        if (!url.startsWith("http://", ignoreCase = true) && !url.startsWith("https://", ignoreCase = true)) {
+            url = "https://$url"
+        }
+        if (!url.endsWith("/")) url = "$url/"
+        return url
     }
 
     /**
@@ -51,5 +66,5 @@ class AuthRepository @Inject constructor(
     fun isAuthenticated(): Boolean = sessionStore.isAuthenticated.value
 
     private fun Throwable.isAuthError(): Boolean =
-        (this as? retrofit2.HttpException)?.code() == 401
+        (this as? retrofit2.HttpException)?.code() in setOf(401, 403)
 }

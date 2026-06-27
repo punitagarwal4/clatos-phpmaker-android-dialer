@@ -2,10 +2,18 @@ package com.clatos.dialer.feature.contacts
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,9 +65,11 @@ class ContactCreateViewModel @Inject constructor(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactCreateScreen(
     onSaved: () -> Unit,
+    onBack: () -> Unit,
     viewModel: ContactCreateViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -67,20 +77,32 @@ fun ContactCreateScreen(
     var phone by remember { mutableStateOf("") }
     var company by remember { mutableStateOf("") }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("New contact", modifier = Modifier.padding(bottom = 8.dp))
-        OutlinedTextField(name, { name = it }, label = { Text("Name") })
-        OutlinedTextField(phone, { phone = it }, label = { Text("Phone") })
-        OutlinedTextField(company, { company = it }, label = { Text("Company") })
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("New contact") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            OutlinedTextField(name, { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(phone, { phone = it }, label = { Text("Phone") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+            OutlinedTextField(company, { company = it }, label = { Text("Company") }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
 
-        state.error?.let {
-            Text(it, modifier = Modifier.padding(top = 8.dp))
+            state.error?.let {
+                Text(it, modifier = Modifier.padding(top = 8.dp))
+            }
+
+            Button(
+                onClick = { viewModel.create(name, phone, company, onSaved) },
+                enabled = !state.saving,
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+            ) { Text(if (state.saving) "Saving…" else "Save to CRM") }
         }
-
-        Button(
-            onClick = { viewModel.create(name, phone, company, onSaved) },
-            enabled = !state.saving,
-            modifier = Modifier.padding(top = 16.dp),
-        ) { Text(if (state.saving) "Saving…" else "Save to CRM") }
     }
 }

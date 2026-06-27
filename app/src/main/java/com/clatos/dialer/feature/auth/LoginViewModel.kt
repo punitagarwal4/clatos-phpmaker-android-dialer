@@ -25,14 +25,17 @@ class LoginViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
 
-    fun login(username: String, password: String) {
-        if (username.isBlank() || password.isBlank()) {
-            _uiState.value = LoginUiState.Error("Enter username and password")
+    /** Prefill the server field with the last-used tenant URL, if any. */
+    fun lastServerUrl(): String = authRepository.currentBaseUrl().orEmpty()
+
+    fun login(serverUrl: String, username: String, password: String) {
+        if (serverUrl.isBlank() || username.isBlank() || password.isBlank()) {
+            _uiState.value = LoginUiState.Error("Enter server URL, username and password")
             return
         }
         _uiState.value = LoginUiState.Loading
         viewModelScope.launch {
-            authRepository.login(username, password)
+            authRepository.login(serverUrl, username, password)
                 .onSuccess { _uiState.value = LoginUiState.Success }
                 .onFailure { _uiState.value = LoginUiState.Error(it.message ?: "Login failed") }
         }

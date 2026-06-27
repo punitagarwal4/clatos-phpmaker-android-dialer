@@ -39,12 +39,18 @@ class MediaRecorderEngine(
             @Suppress("DEPRECATION")
             MediaRecorder()
         }
+        // Voice-call sources are narrowband; 44.1 kHz fails on several OEMs, so
+        // use 16 kHz for VOICE_CALL/VOICE_RECOGNITION and 44.1 kHz for plain MIC.
+        val isVoiceSource = strategy == RecordingStrategy.VOICE_CALL ||
+            strategy == RecordingStrategy.VOICE_RECOGNITION
+        val sampleRate = if (isVoiceSource) 16_000 else 44_100
+        val bitRate = if (isVoiceSource) 64_000 else 96_000
         rec.apply {
             setAudioSource(audioSource)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setAudioEncodingBitRate(96_000)
-            setAudioSamplingRate(44_100)
+            setAudioEncodingBitRate(bitRate)
+            setAudioSamplingRate(sampleRate)
             setOutputFile(output.absolutePath)
             prepare()
             start()
